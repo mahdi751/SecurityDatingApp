@@ -1,5 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using API.Entities;
 using API.Interfaces;
@@ -35,7 +36,7 @@ public class TokenService : ITokenService
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.Now.AddDays(7),
+            Expires = DateTime.Now.AddDays(1),
             SigningCredentials = creds
         };
 
@@ -45,4 +46,31 @@ public class TokenService : ITokenService
 
         return tokenHandler.WriteToken(token);
     }
+
+    public string CreateRefreshToken(){
+        var tokenBytes = RandomNumberGenerator.GetBytes(64);
+        var refreshToken = Convert.ToBase64String(tokenBytes);
+
+        return refreshToken;
+    }
+
+    public ClaimsPrincipal GetPrincipleFromExpiredToken(string token){
+        var key = _key;
+        var tokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey =
+                        key,
+                    ValidateIssuer = false,
+                    ValidateAudience = false
+                };
+        var tokenHandle = new JwtSecurityTokenHandler();
+        SecurityToken securityToken;
+        var principal = tokenHandle.ValidateToken(token, tokenValidationParameters, out securityToken);
+        var jwtSecurityToken = securityToken as JwtSecurityToken;
+        if(jwtSecurityToken == null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha512Signature, StringComparison.InvariantCultureIgnoreCase)){
+            throw new SecurityTokenException("Invalid expired token");
+        }
+        return principal;
+ }
 }

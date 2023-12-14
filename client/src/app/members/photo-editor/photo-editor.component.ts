@@ -70,7 +70,7 @@ export class PhotoEditorComponent implements OnInit {
       allowedFileType: ['image'],
       removeAfterUpload: true,
       autoUpload: false,
-      maxFileSize: 10 * 1024 * 1024
+      maxFileSize: 1 * 1024 * 1024 //1 mb
     });
 
     this.uploader.onAfterAddingFile = (file) => {

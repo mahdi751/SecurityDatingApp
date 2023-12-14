@@ -29,6 +29,7 @@ public class AccountController : BaseApiController
     {
         if (await UserExists(registerDto.Username)) return BadRequest("Username is taken");
 
+        var refreshToken = _tokenService.CreateRefreshToken();
         var user = _mapper.Map<AppUser>(registerDto);
 
         user.UserName = registerDto.Username.ToLower();
@@ -45,6 +46,7 @@ public class AccountController : BaseApiController
         {
             Username = user.UserName,
             Token = await _tokenService.CreateToken(user),
+            RefreshToken = refreshToken,
             KnownAs = user.KnownAs,
             Gender = user.Gender
         };
@@ -67,6 +69,7 @@ public class AccountController : BaseApiController
         {
             Username = user.UserName,
             Token = await _tokenService.CreateToken(user),
+            RefreshToken = _tokenService.CreateRefreshToken(),
             PhotoUrl = user.Photos.FirstOrDefault(x => x.IsMain)?.Url,
             KnownAs = user.KnownAs,
             Gender = user.Gender
@@ -77,4 +80,29 @@ public class AccountController : BaseApiController
     {
         return await _userManager.Users.AnyAsync(x => x.UserName == username.ToLower());
     }
+
+    [HttpPost("refreshToken")]
+    public async Task<IActionResult> RefreshToken(TokenApiDto tokenApiDto){
+        if(tokenApiDto == null){
+            return BadRequest("Invalid refresh token");
+        }
+
+        string token = tokenApiDto.Token;
+        string refreshToken = tokenApiDto.RefreshToken;
+        var principal = _tokenService.GetPrincipleFromExpiredToken(token);
+        var username = principal.Identity.Name;
+        var user = await _userManager.Users.FirstOrDefaultAsync(u=> u.UserName == username);
+        var newToken = _tokenService.CreateToken(user);
+        var newRefreshToken = _tokenService.CreateRefreshToken();
+        await _userManager.UpdateAsync(user);
+        return Ok(new UserDto
+        {
+            Username = user.UserName,
+            Token = await _tokenService.CreateToken(user),
+            RefreshToken = _tokenService.CreateRefreshToken(),
+            PhotoUrl = user.Photos.FirstOrDefault(x => x.IsMain)?.Url,
+            KnownAs = user.KnownAs,
+            Gender = user.Gender
+   });
+}
 }
