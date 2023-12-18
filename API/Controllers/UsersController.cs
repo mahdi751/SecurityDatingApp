@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net;
+
 
 using nClam;
 
@@ -150,6 +152,39 @@ namespace API.Controllers
                     PublicId = result.PublicId
                 };
 
+                if (user.Photos.Any(existingPhoto => existingPhoto.Url == photo.Url))
+                {
+                    return BadRequest("This photo is already in the database.");
+                }
+
+                using (var stream = file.OpenReadStream())
+                {
+                    foreach (var dbPhoto in user.Photos)
+                    {
+                        using (var webClient = new WebClient())
+                        {
+                            using (var dbPhotoStream = new MemoryStream(webClient.DownloadData(dbPhoto.Url)))
+                            {
+                                var similarity = _photoService.CalculateImageSimilarity(stream, dbPhotoStream);
+
+                                if (similarity > 0.65)
+                                {
+                                    _logger.LogInformation("Similarity is :"+similarity);
+                                    _logger.LogError("Similar photo already exists in the database.");
+                                    return BadRequest();
+                                }
+                                else{
+                                    _logger.LogInformation("Similarity is :"+similarity);
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+
+
+
                 if (user.Photos.Count == 0) photo.IsMain = true;
 
                 user.Photos.Add(photo);
@@ -209,18 +244,5 @@ namespace API.Controllers
 
             return BadRequest("Problem deleting the photo");
         }
-
-        // private bool IsFileClean(byte[] fileBytes)
-        // {
-        //     // Specify the path to the ClamAV server (localhost in this case) so we have the default ip and port number
-        //     using (var clam = new ClamClient("127.0.0.1", 3310))
-        //     {
-        //         // Perform the scan
-        //         var scanResult = clam.ScanFile(fileBytes);
-
-        //         // Check the result
-        //         return scanResult == ClamScanResults.Clean;
-        //     }
-        // }
     }
 }
